@@ -1,9 +1,12 @@
 ## New Fight Game
 
 # Imports:
-import random , time 
+import random 
+import time
+import pandas as pd
+import matplotlib.pyplot as plt
 from inputimeout import inputimeout 
-
+df = pd.read_csv("FightGame_savefiles.csv")
 
 # Player variables
 
@@ -26,16 +29,21 @@ inventory = []
 
 end_match = False
 win = False
+Dead = False
 # enemy variables
-enemies = {1 :{"Class":"Soldier" , "Health":50 , "Defence":25 , "Magic_Power":3 , "Attack_Power":3 , "XP_drop":10 , "Gold_drop":5},
-           2 :{"Class":"Brute" , "Health":100 , "Defence":10 , "Magic_Power":1 , "Attack_Power":5 , "XP_drop":15 , "Gold_drop":10},
-           3 :{"Class":"Warlock" , "Health":50 , "Defence":50 , "Magic_Power":5 , "Attack_Power":2 , "XP_drop":5 , "Gold_drop":5}
+enemies = {1 :{"Class":"Soldier" , "Health":50 , "Defence":25 , "Magic_Power":3 , "Attack_Power":3 , "XP_drop":10 , "Gold_drop":5 , "Times_fought":5},
+           2 :{"Class":"Brute" , "Health":100 , "Defence":10 , "Magic_Power":1 , "Attack_Power":5 , "XP_drop":15 , "Gold_drop":10 , "Times_fought":3},
+           3 :{"Class":"Warlock" , "Health":50 , "Defence":50 , "Magic_Power":5 , "Attack_Power":2 , "XP_drop":5 , "Gold_drop":5  , "Times_fought":12}
            }
 enemy_attack_types = {1 : {"Name":"Basic Melee" , "Strength":1} , 
                       2 : {"Name":"Heavy Magic" , "Strength":3} , 
                       3 : {"Name":"Basic Magic" , "Strength":1} , 
                       4:  {"Name":"Heavy Magic" , "Strength":3}
                     }
+
+shop = {1:{"Item Name":"Magic Tokens" , "Description":"Restores 3 magic tokens" , "Price":10},
+        2:{"Item Name":"Health" , "Description":"Restores 10 Health" , "Price":5},
+        3:{"Item Name":"Defence" , "Description":"Restores 10 defence" , "Price":5}}
 
 
 ##
@@ -50,9 +58,11 @@ def Main_Menu():
     print("=" * 30)
     print("## 1. Fight an enemy")
     print("## 2. Shop")
-    print("## 3. Boss Fight")
-    print("## 4. View Stats")
-    print("## 5. View History")
+    #print("## 3. Boss Fight")
+    print("## 3. View Stats")
+    print("## 4. View History")
+    print("## 5. Tutorials")
+    print("## 6. Save Game")
     print("=" * 30)
     while True:
         choice = input(">>")
@@ -105,7 +115,18 @@ def level_up(Level , xp , Magic_Power , Attack_Power):
 def enemy_select():
     enemy = random.choice(list(enemies.values()))
     print(f'Opponent: {enemy["Class"]}')
+    enemy["Times_fought"] = enemy["Times_fought"] + 1
     return enemy
+
+def chart_history():
+    labels = [enemy["Class"] for enemy in enemies.values()]
+    times_fought = [enemy["Times_fought"] for enemy in enemies.values()]
+
+    plt.figure()
+    plt.pie(times_fought, labels=labels, autopct="%1.1f%%")
+    plt.title("Session Fight History")
+    plt.show()
+
 
 #decide wether player attacks or defends first
 def decide_starter():
@@ -135,13 +156,14 @@ def enemy_scaling(enemy , Level):
 
 
 # Check the match isnt over
-def death_check(enemy , end_match , win):
+def death_check(enemy_health , end_match , win , Health , Dead):
     if Health <= 0 :
         end_match = True
-        win = True
-    if enemy["Health"] <= 0:
+        Dead = True
+    if enemy_health <= 0:
         end_match = True
-    return end_match , win
+        win = True
+    return end_match , win , Dead
 
 def win_event(gold , xp , enemy):
     gold = gold + enemy["Gold_drop"]
@@ -223,7 +245,7 @@ def player_turn(EHealth , EDefence , Health , Attack_Power , Magic_Power , magic
     accuracy = dice_roll()
     if ".0" in str(accuracy / 2):
         if attack_strength > EDefence:
-            EHealth = Enemy_Health - attack_strength
+            EHealth = EHealth - attack_strength
         else:
             EDefence = EDefence - attack_strength
     else:
@@ -234,55 +256,292 @@ def player_turn(EHealth , EDefence , Health , Attack_Power , Magic_Power , magic
 
     return EHealth , EDefence , magic_tokens
 
+#######
+# enemy turn tutorial
+def enemy_turn_tutorial(EHealth , EDefence , Attack_Power , Magic_Power , enemy , Health , Defence):
+    print("=" * 30)
+    print(f'Enemy Class: {enemy["Class"]} - This is the enemy type, selected at random at the start of each battle \nHealth: {EHealth} - Health is the amount of hits an enemy can take before dying \nDefence: {EDefence} - your attack must be greater than defence to affect the enemies health or the attack will damage the enemies defence capabilities ')
+    
+    attack = random.choice(list(enemy_attack_types.values()))
+    attack_strength = attack["Strength"] * Attack_Power
+
+    print(f'Enemy uses a {attack["Name"]} - This is the type of attack the enemy uses')
+    print(f"Attack strength {attack_strength} - The strength of the attack is multiplied by the enemies attack power")
+    
+    if "magic" in attack["Name"].lower():
+        attack_strength = attack_strength * Magic_Power
+    
+    print(f"Magic amplifies the strength of the attack to {attack_strength} - if an attack is magic then the strength of the attack is multiplied again by the enemies magic power")
+    
+
+    
+    print("This attack is too strong to dodge - This message will appear if the attack is greater than your defence")
+        
+
+    if 1 + 1 == 2: 
+        print("Roll an odd number to dodge - defensive moves require you to roll an odd number. Try here")
+        dodge = dice_roll()
+        if ".5" in str(dodge / 2) and attack_strength<= Defence:
+            print("Attack succesfully dodged")
+            Defence = Defence = attack_strength
+        else:
+            print("Failed to dodge attack")
+            Health = Health - attack_strength
+    
+    print("If the dodge fails then the damage is taken from a users health")
+
+
+# player turn
+def player_turn_tutorial (EHealth , EDefence , Health , Attack_Power , Magic_Power , magic_tokens):
+    print("=" * 30)
+    print(f'Health: {Health} - Here your health and defence are displayed \nDefence: {Defence}')
+
+    while True:
+        print("Attack options:")
+        print("## 1. Melee - allows you to perform a melee attack")
+        print("## 2. Magic - performs a magic attack meaning that the attack is multiplied by your magic power. This action costs magic tokens")
+
+        choice = input(">>")
+
+        try:
+            int(choice)
+        except:
+            print("Invalid Input. Try again")
+        else:
+            
+            print("Roll for attack - This roll decides the strength of an attack. Try here")
+            if choice == "1":
+                attack_strength_1 = dice_roll()
+                #attack_strength_2 = dice_roll()
+                attack_strength = attack_strength_1 * Attack_Power
+                break
+        
+            elif choice == "2" and magic_tokens != 0:
+                magic_tokens = magic_tokens - 1
+                attack_strength_1 = dice_roll()
+                #attack_strength_2 = dice_roll()
+                attack_strength = (attack_strength_1 * Attack_Power) * Magic_Power
+                break
+            elif choice == "2" and magic_tokens == 0:
+                print("You cannot perform magic attacks without tokens")
+            else:
+                print("Invalid Input. Try again")
+        
+    print(f"Your attack is {attack_strength}")
+    ###roll to hit
+    print("Roll an even number to make a successfull attack - offensive actions require even rolls. Try here")
+    accuracy = dice_roll()
+    if ".0" in str(accuracy / 2):
+        if attack_strength > EDefence:
+            EHealth = EHealth - attack_strength
+        else:
+            EDefence = EDefence - attack_strength
+    else:
+        print("Attack failed")
+
+    ###enemy take damage
+
+
+    
+#######
+
+def display_stats(Level , gold , xp , Health , Defence , magic_tokens , Attack_Power , Magic_Power  ):
+    print(f'Level:{Level} \nGold:{gold} \nXP: {xp} \nHealth: {Health} \nDefence: {Defence} \nMagic Tokens: {magic_tokens} \nAttack Power: {Attack_Power} \n Magic Power: {Magic_Power}')
 
 #######
 
-def display_stats():
-    print(f'Level:{Level} \nGold:{gold} \nXP: {xp} \nHealth: {Health} \nDefence: {Defence} \nMagic Tokens: {magic_tokens} \nAttack Power: {Attack_Power} \n Magic Power: {Magic_Power}')
-#System##########################################################################################################################################
-while True:
-    win = False
-    end_match = False
-    Level , xp , Magic_Power , Attack_Power = level_up(Level , xp , Magic_Power , Attack_Power)
-    choice = Main_Menu()
+def shopping(gold , Health , Defence , magic_tokens):
+    print(f"You have {gold} gold")
 
-    if choice == "1":
-        enemy = enemy_select()
-        start = decide_starter()
-        Enemy_Health , Enemy_Defence , Enemy_Attack_Power , Enemy_Magic_Power = enemy_scaling(enemy , Level)
+    for i, item in enumerate(shop.values()):
+        print(f"{i+1}: {item['Item Name']}")
+        print(f"   {item['Description']}")
+        print(f"   {item['Price']} gold")
+    
 
 
-        while end_match == False:
-            if start == True:
-                Enemy_Health , Enemy_Defence , magic_tokens = player_turn(Enemy_Health , Enemy_Defence , Health , Attack_Power , Magic_Power , magic_tokens)
-                end_match  , win = death_check(enemy , end_match , win)
-                if end_match == True:
-                    break
-                Health , Defence = enemy_turn(Enemy_Health , Enemy_Defence , Enemy_Attack_Power , Enemy_Magic_Power , enemy , Health , Defence)
-                end_match , win = death_check(enemy , end_match , win)
-                if end_match == True:
-                    break
+    while True:
+        try:
+            choice = input(">>")
+        except:
+            print("Invalid input")
+        
+        else:
             
-            if start == False:
-                Health , Defence = enemy_turn(Enemy_Health , Enemy_Defence , Enemy_Attack_Power , Enemy_Magic_Power , enemy , Health , Defence)
-                end_match , win = death_check(enemy , end_match , win)
-                if end_match == True:
-                    break
-                Enemy_Health , Enemy_Defence , magic_tokens = player_turn(Enemy_Health , Enemy_Defence , Health , Attack_Power , Magic_Power , magic_tokens)
-                end_match , win = death_check(enemy , end_match , win)
-                if end_match == True:
-                    break
-        if win == True:
-            print("You win")
-            print(f'Rewards: \nXP: +{enemy["XP_drop"]} \nGold: +{enemy["Gold_drop"]}')
-            xp , gold = win_event(gold , xp , enemy)
+            choice = str(int(choice) - 1)
+            
+            print("Are you sure? y/n")
+        confirm = input(">>")
+        if confirm.lower() == "y":
+            
+            if choice == "0" and gold >= 10:
+                
+                magic_tokens = magic_tokens + 3
+                gold = gold - 10
+            elif choice == "1" and gold >= 5:
+                
+                Health = Health + 10
+                gold = gold - 5
+            elif choice == "2" and gold >= 5:
+                
+                Defence = Defence + 10
+                gold = gold - 5            
+            else:
+                print("Not enough Gold")
+        else:
+            print("Purchase cancelled")
 
-    if choice == "4":
-        display_stats()
-        print("="*30)
+        break
+                 
 
+
+    return gold , Health , Defence , magic_tokens
+
+#System##########################################################################################################################################
+
+def sys_loop( Level , Health , Defence , xp , gold , Attack_Power , Magic_Power , magic_tokens , win , end_match , Dead):
+    while True:
+        win = False
+        end_match = False
+        Level , xp , Magic_Power , Attack_Power = level_up(Level , xp , Magic_Power , Attack_Power)
+        choice = Main_Menu()
+
+        if choice == "1":
+            enemy = enemy_select()
+            start = decide_starter()
+            Enemy_Health , Enemy_Defence , Enemy_Attack_Power , Enemy_Magic_Power = enemy_scaling(enemy , Level)
+
+
+            while end_match == False:
+                if start == True:
+                    Enemy_Health , Enemy_Defence , magic_tokens = player_turn(Enemy_Health , Enemy_Defence , Health , Attack_Power , Magic_Power , magic_tokens)
+                    end_match  , win , Dead = death_check(Enemy_Health , end_match , win , Health , Dead)
+                    if end_match == True:
+                        break
+                    Health , Defence = enemy_turn(Enemy_Health , Enemy_Defence , Enemy_Attack_Power , Enemy_Magic_Power , enemy , Health , Defence)
+                    end_match  , win , Dead = death_check(Enemy_Health , end_match , win , Health , Dead)
+                    if end_match == True:
+                        break
+                    print(end_match)
+                if start == False:
+                    Health , Defence = enemy_turn(Enemy_Health , Enemy_Defence , Enemy_Attack_Power , Enemy_Magic_Power , enemy , Health , Defence)
+                    end_match  , win , Dead = death_check(Enemy_Health , end_match , win , Health , Dead)
+                    if end_match == True:
+                        break
+                    Enemy_Health , Enemy_Defence , magic_tokens = player_turn(Enemy_Health , Enemy_Defence , Health , Attack_Power , Magic_Power , magic_tokens)
+                    end_match  , win , Dead = death_check(Enemy_Health , end_match , win , Health , Dead)
+                    if end_match == True:
+                        break
+                    print(end_match)
+            if win == True:
+                print("You win")
+                print(f'Rewards: \nXP: +{enemy["XP_drop"]} \nGold: +{enemy["Gold_drop"]}')
+                xp , gold = win_event(gold , xp , enemy)
+
+        elif choice == "2":
+            gold , Health , Defence , magic_tokens = shopping(gold , Health , Defence , magic_tokens)
+
+        elif choice == "3":
+            display_stats(Level , gold , xp , Health , Defence , magic_tokens , Attack_Power , Magic_Power )
+            print("="*30)
+
+        elif choice == "4":
+            chart_history()
+
+        elif choice == "5":
+            enemy = enemy_select()
+            Enemy_Health , Enemy_Defence , Enemy_Attack_Power , Enemy_Magic_Power = enemy_scaling(enemy , Level)
+            enemy_turn_tutorial(Enemy_Health , Enemy_Defence , Enemy_Attack_Power , Enemy_Magic_Power , enemy , Health , Defence)
+            player_turn_tutorial(Enemy_Health , Enemy_Defence , Health , Attack_Power , Magic_Power , magic_tokens)
+        elif choice == "6":
+            save_file(Level , Health , Defence , xp , gold , Attack_Power , Magic_Power , magic_tokens)
+
+        else:
+            print("Under Construction")
+        
+        if Dead == True:
+            break
+
+
+# load a save file and reassigns variables
+def load_file(Level , Health , Defence , xp , gold , Attack_Power , Magic_Power , magic_tokens):
+
+    print("Please Select your file:")
+
+    for i in range(len(df)):
+        print(f'## {i+1}:{df["Save Name"][i]}')
+    
+    while True:
+        choice = input(">>")
+
+        try:
+            int(choice)
+        except:
+            print("Invalid Input. Try again")
+        else:
+            break
+
+
+    choice = int(choice) - 1
+    Level = df["Level"][choice]
+    Health = df["Health"][choice]
+    Defence = df["Defence"][choice]
+    xp = df["Xp"][choice]
+    gold = df["Gold"][choice]
+    Attack_Power = df["Attack Power"][choice]
+    Magic_Power = df["Magic Power"][choice]
+    magic_tokens = df["magic tokens"][choice]
+
+
+
+    return Level , Health , Defence , xp , gold , Attack_Power , Magic_Power , magic_tokens
+
+def save_file(Level , Health , Defence , xp , gold , Attack_Power , Magic_Power , magic_tokens):
+    print("Enter Save name")
+    name = input(">>")
+
+    index = len(df) + 1
+    df["Save Name"][index] = name
+    df["Level"][index] = Level 
+    df["Health"][index] = Health 
+    df["Defence"][index] = Defence 
+    df["Xp"][index] = xp 
+    df["Gold"][index] = gold
+    df["Attack Power"][index] = Attack_Power
+    df["Magic Power"][index] = Magic_Power 
+    df["magic tokens"][index] = magic_tokens
+
+    print("Game saved")
+
+
+
+
+################################################################################################################
+print("=" * 30)
+print("Welcome")
+print("## 1. Start")
+print("## 2. Load Save File")
+
+while True:
+    choice = input(">>")
+
+    try:
+        int(choice)
+    except:
+        print("Invalid Input. Try again")
     else:
-        print("Under Construction")
+        break
+
+if choice == "1":
+    sys_loop(Level , Health , Defence , xp , gold , Attack_Power , Magic_Power , magic_tokens , win , end_match , Dead)
+
+elif choice == "2":
+    Level , Health , Defence , xp , gold , Attack_Power , Magic_Power , magic_tokens = load_file(Level , Health , Defence , xp , gold , Attack_Power , Magic_Power , magic_tokens)
+    sys_loop(Level , Health , Defence , xp , gold , Attack_Power , Magic_Power , magic_tokens , win , end_match , Dead)
+
+
+
+print("You Died")
 
 
 
