@@ -2,9 +2,11 @@ import random
 
 player_position = {"Lat":0 , "Long":0}
 
-biomes = {"Desert":10 , "Forrest":10 , "Mountains":10}
+biomes = {"Desert":15 , "Forrest":15 , "Mountains":15 , "Snowy tundra":15 , "Plains":15 , "Ocean":15}
 
-map = { 0:{"Lat":0 , "Long":0 , "Biome":"Desert"}
+structures = {"Temple":10 , "Village":10 , "Encampment":10 , "Empty":50}
+
+map = { 0:{"Lat":0 , "Long":0 , "Biome":"Desert" , "Structures":"Empty"}
 
 }
 
@@ -12,7 +14,11 @@ def output_player_position(map):
     for i in range(len(map)):
         if player_position["Lat"] == map[i]["Lat"] and player_position["Long"] == map[i]["Long"]:
             position = map[i]["Biome"]
-            print(f"Player is in a {position}")
+            content = map[i]["Structures"]
+            if content == "Empty":
+                print(f"Player is in a {position}")
+            else:
+                print(f"Player is in a {position}  \nThere appears to be a {content} in this area")
 
     return position
 
@@ -32,12 +38,18 @@ def create_position(temp_player_position , player_position , map , position):
 
     # Increase weight of current biome
     if position in biomes:
-        biomes[position] += 10
+        biomes[position] += 20
 
     # Pick weighted random biome
     new_position_biome = random.choices(
         list(biomes.keys()),
         weights=list(biomes.values()),
+        k=1
+    )[0]
+
+    new_position_structure = random.choices(
+        list(structures.keys()),
+        weights=list(structures.values()),
         k=1
     )[0]
 
@@ -48,7 +60,7 @@ def create_position(temp_player_position , player_position , map , position):
     new_long = temp_player_position["Long"]
 
     new_key = len(map)
-    map[new_key] = {"Lat": new_lat, "Long": new_long, "Biome": new_position_biome}
+    map[new_key] = {"Lat": new_lat, "Long": new_long, "Biome": new_position_biome ,  "Structures": new_position_structure }
 
     return temp_player_position , player_position , map
 
@@ -83,6 +95,9 @@ def player_move(player_position , map , position):
     if choice.lower() == "west":
         new_lat = player_position["Lat"] 
         new_long = player_position["Long"] - 1
+    
+    if choice.lower() == "0":
+        print(map)
         
 
     temp_player_position = {"Lat":new_lat , "Long":new_long}
