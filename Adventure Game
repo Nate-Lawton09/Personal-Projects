@@ -1,0 +1,332 @@
+# Imports:
+import random 
+import time
+import pandas as pd
+import matplotlib.pyplot as plt
+from inputimeout import inputimeout 
+
+
+
+Health = 50
+Defence = 30
+
+Magic_Power = 3
+Attack_Power = 3
+
+magic_tokens = 3
+
+start = False
+
+
+
+inventory = []
+
+end_match = False
+win = False
+Dead = False
+# enemy variables
+enemies = {1 :{"Class":"Soldier" , "Health":50 , "Defence":25 , "Magic_Power":3 , "Attack_Power":3 , "XP_drop":10 , "Gold_drop":5 , "Times_fought":5},
+           2 :{"Class":"Brute" , "Health":100 , "Defence":10 , "Magic_Power":1 , "Attack_Power":5 , "XP_drop":15 , "Gold_drop":10 , "Times_fought":3},
+           3 :{"Class":"Warlock" , "Health":50 , "Defence":50 , "Magic_Power":5 , "Attack_Power":2 , "XP_drop":5 , "Gold_drop":5  , "Times_fought":12}
+           }
+enemy_attack_types = {1 : {"Name":"Basic Melee" , "Strength":1} , 
+                      2 : {"Name":"Heavy Magic" , "Strength":3} , 
+                      3 : {"Name":"Basic Magic" , "Strength":1} , 
+                      4:  {"Name":"Heavy Magic" , "Strength":3}
+                    }
+
+shop = {1:{"Item Name":"Magic Tokens" , "Description":"Restores 3 magic tokens" , "Price":10},
+        2:{"Item Name":"Health" , "Description":"Restores 10 Health" , "Price":5},
+        3:{"Item Name":"Defence" , "Description":"Restores 10 defence" , "Price":5}}
+
+
+##
+dice = [1,2,3,4,5,6]
+
+
+def dice_roll():
+
+    user_input = 0
+    flag = False
+    while flag != True:
+        for i in range(len(dice)):
+        
+            try:
+                user_input = inputimeout( prompt = f">> {dice[i]}" , timeout = 0.2)
+            except:
+              
+                print("\033[F\033[K", end="")
+                
+            else:
+                user_input = dice[i]
+                flag = True
+                break
+    return user_input
+
+def enemy_select():
+    enemy = random.choice(list(enemies.values()))
+    print(f'Opponent: {enemy["Class"]}')
+    enemy["Times_fought"] = enemy["Times_fought"] + 1
+    return enemy
+def decide_starter():
+    #print("Would you like to use luck?") 
+
+    coin = random.randint(1,2)
+    if coin == 1:
+        start = True
+        print("You play first")
+    else:
+        start = False
+        print("Opponent plays first")
+    
+    return start
+
+#scale the enemy
+def enemy_scaling(enemy):
+    Enemy_Health = enemy["Health"]
+    Enemy_Defence = enemy["Defence"] 
+    Enemy_Magic_Power = enemy["Magic_Power"] 
+    Enemy_Attack_Power = enemy["Attack_Power"] 
+
+    return Enemy_Health , Enemy_Defence , Enemy_Attack_Power , Enemy_Magic_Power
+
+
+
+# Check the match isnt over
+def death_check(enemy_health , end_match , win , Health , Dead):
+    if Health <= 0 :
+        end_match = True
+        Dead = True
+    if enemy_health <= 0:
+        end_match = True
+        win = True
+    return end_match , win , Dead
+
+# enemy turn
+def enemy_turn(EHealth , EDefence , Attack_Power , Magic_Power , enemy , Health , Defence ):
+    print("=" * 30)
+    print(f'Enemy Class: {enemy["Class"]} \nHealth: {EHealth} \nDefence: {EDefence} ')
+    
+    attack = random.choice(list(enemy_attack_types.values()))
+    attack_strength = attack["Strength"] * Attack_Power
+
+    print(f'Enemy uses a {attack["Name"]}')
+    print(f"Attack strength {attack_strength}")
+    
+    if "magic" in attack["Name"].lower():
+        attack_strength = attack_strength * Magic_Power
+        print(f"Magic amplifies the strength of the attack to {attack_strength}")
+    
+
+    if attack_strength > Defence :
+        print("This attack is too strong to dodge")
+        Health = Health - attack_strength
+
+    else: 
+        print("Roll an odd number to dodge")
+        dodge = dice_roll()
+        if ".5" in str(dodge / 2) and attack_strength<= Defence:
+            print("Attack succesfully dodged")
+            Defence = Defence = attack_strength
+        else:
+            print("Failed to dodge attack")
+            Health = Health - attack_strength
+    return Health , Defence
+
+
+# player turn
+def player_turn(EHealth , EDefence , Health , Attack_Power , Magic_Power , magic_tokens  ):
+    print("=" * 30)
+    print(f'Health: {Health} \nDefence: {Defence}')
+
+    while True:
+        print("Attack options:")
+        print("## 1. Melee")
+        print("## 2. Magic")
+
+        choice = input(">>")
+
+        try:
+            int(choice)
+        except:
+            print("Invalid Input. Try again")
+        else:
+            
+            print("Roll for attack")
+            if choice == "1":
+                attack_strength_1 = dice_roll()
+                #attack_strength_2 = dice_roll()
+                attack_strength = attack_strength_1 * Attack_Power
+                break
+        
+            elif choice == "2" and magic_tokens != 0:
+                magic_tokens = magic_tokens - 1
+                attack_strength_1 = dice_roll()
+                #attack_strength_2 = dice_roll()
+                attack_strength = (attack_strength_1 * Attack_Power) * Magic_Power
+                break
+            elif choice == "2" and magic_tokens == 0:
+                print("You cannot perform magic attacks without tokens")
+            else:
+                print("Invalid Input. Try again")
+        
+    print(f"Your attack is {attack_strength}")
+    ###roll to hit
+    print("Roll an even number to make a successfull attack")
+    accuracy = dice_roll()
+    if ".0" in str(accuracy / 2):
+        if attack_strength > EDefence:
+            EHealth = EHealth - attack_strength
+        else:
+            EDefence = EDefence - attack_strength
+    else:
+        print("Attack failed")
+
+    ###enemy take damage
+
+
+    return EHealth , EDefence , magic_tokens
+
+def fight( Health , Defence , Attack_Power , Magic_Power , magic_tokens , end_match , win ,Dead ):
+    enemy = enemy_select()
+    start = decide_starter()
+    Enemy_Health , Enemy_Defence , Enemy_Attack_Power , Enemy_Magic_Power = enemy_scaling(enemy  )
+
+    end_match = False
+    while end_match == False:
+        if start == True:
+            Enemy_Health , Enemy_Defence , magic_tokens = player_turn(Enemy_Health , Enemy_Defence , Health , Attack_Power , Magic_Power , magic_tokens)
+            end_match  , win , Dead = death_check(Enemy_Health , end_match , win , Health , Dead)
+            if end_match == True:
+                break
+            Health , Defence = enemy_turn(Enemy_Health , Enemy_Defence , Enemy_Attack_Power , Enemy_Magic_Power , enemy , Health , Defence)
+            end_match  , win , Dead = death_check(Enemy_Health , end_match , win , Health , Dead)
+            if end_match == True:
+                break
+            print(end_match)
+        if start == False:
+            Health , Defence = enemy_turn(Enemy_Health , Enemy_Defence , Enemy_Attack_Power , Enemy_Magic_Power , enemy , Health , Defence)
+            end_match  , win , Dead = death_check(Enemy_Health , end_match , win , Health , Dead)
+            if end_match == True:
+                break
+            Enemy_Health , Enemy_Defence , magic_tokens = player_turn(Enemy_Health , Enemy_Defence , Health , Attack_Power , Magic_Power , magic_tokens)
+            end_match  , win , Dead = death_check(Enemy_Health , end_match , win , Health , Dead)
+            if end_match == True:
+                break
+            print(end_match)
+        if win == True:
+            print("You win")
+
+
+player_position = {"Lat":0 , "Long":0}
+
+biomes = {"Path":50 , "Fight":50}
+
+map = { 0:{"Lat":0 , "Long":0 , "Biome":"Path"}
+
+}
+
+def output_player_position(map):
+    for i in range(len(map)):
+        if player_position["Lat"] == map[i]["Lat"] and player_position["Long"] == map[i]["Long"]:
+            position = map[i]["Biome"]
+
+            if position == "Fight":
+                fight(  Health , Defence , Attack_Power , Magic_Power , magic_tokens , end_match , win ,Dead )
+
+            else:
+                print(f"Player is on the {position}")
+
+    return position
+
+
+def check_position_exists(check , temp_player_position , map):
+    for i in range(len(map)):
+        if temp_player_position["Lat"] != map[i]["Lat"] and temp_player_position["Long"] != map[i]["Long"]:
+            check = False
+        elif temp_player_position["Lat"] == map[i]["Lat"] and temp_player_position["Long"] == map[i]["Long"]:
+            check = True
+        
+
+    return check
+
+def create_position(temp_player_position , player_position , map , position):
+    print("Generating position")
+
+    # Increase weight of current biome
+    
+
+    # Pick weighted random biome
+    new_position_biome = random.choices(
+        list(biomes.keys()),
+        weights=list(biomes.values()),
+        k=1
+    )[0]
+
+    
+    new_lat = temp_player_position["Lat"]
+    new_long = temp_player_position["Long"]
+
+    new_key = len(map)
+    map[new_key] = {"Lat": new_lat, "Long": new_long, "Biome": new_position_biome}
+
+    return temp_player_position , player_position , map
+
+
+def player_move(player_position , map , position):
+    check = 0
+    print("Movement options (enter full word):")
+    print("North")
+    print("South")
+    print("East")
+    print("West")
+
+    choice = input(">>")
+
+
+    ##### North == positive lat     South == negative Lat   East == positive long   West == negative long
+    if choice.lower() == "north":
+        new_lat = player_position["Lat"] + 1
+        new_long = player_position["Long"]
+        
+
+    if choice.lower() == "south":
+        new_lat = player_position["Lat"] - 1
+        new_long = player_position["Long"] 
+        
+
+    if choice.lower() == "east":
+        new_lat = player_position["Lat"] 
+        new_long = player_position["Long"] + 1
+        
+
+    if choice.lower() == "west":
+        new_lat = player_position["Lat"] 
+        new_long = player_position["Long"] - 1
+        
+
+    temp_player_position = {"Lat":new_lat , "Long":new_long}
+    
+    check = check_position_exists(check , temp_player_position , map)
+
+    if check == True:
+        player_position = temp_player_position
+        print("Moved")
+    else:
+        
+        temp_player_position , player_position , map = create_position(temp_player_position , player_position , map , position)
+        if temp_player_position == "Wall":
+            print("You cannot Move this way")
+        
+        else:
+            player_position = temp_player_position
+    
+    return player_position , map
+
+            
+
+###
+while True:
+    position = output_player_position(map)
+    player_position , map = player_move(player_position , map , position)
+    input("")
